@@ -1,6 +1,7 @@
 use clap::Parser;
 use fast_bfc::{
-    interpreted::serialized::{Machine, Program, Tape},
+    interpreter::{Interface, Machine, Tape},
+    ir::Program,
     source::Source,
 };
 use std::{
@@ -15,6 +16,8 @@ struct Cli {
     path: PathBuf,
     #[arg(short = 's', long = "tape-size", default_value = "65536")]
     tape_size: usize,
+    #[arg(short = 'r', long = "print-ir")]
+    print_ir: bool,
 }
 
 fn try_main() -> anyhow::Result<()> {
@@ -22,9 +25,14 @@ fn try_main() -> anyhow::Result<()> {
     let reader = BufReader::new(File::open(cli.path)?);
     let source = Source::from_reader(reader);
     let program = Program::parse(source)?;
-    let tape = Tape::new(cli.tape_size);
-    let machine = Machine::new(program, tape, io::stdin(), io::stdout());
-    machine.run()?;
+    if cli.print_ir {
+        println!("{}", program);
+    } else {
+        let tape = Tape::new(cli.tape_size);
+        let interface = Interface::new(io::stdin(), io::stdout());
+        let machine = Machine::new(program, tape, interface);
+        machine.run()?;
+    }
     Ok(())
 }
 

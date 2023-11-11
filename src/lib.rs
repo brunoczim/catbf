@@ -1,2 +1,3 @@
 pub mod source;
-pub mod interpreted;
+pub mod ir;
+pub mod interpreter;
