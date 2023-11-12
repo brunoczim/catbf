@@ -14,8 +14,6 @@ use std::{
 #[derive(Debug, Clone, Parser)]
 struct Cli {
     path: PathBuf,
-    #[arg(short = 's', long = "tape-size", default_value = "65536")]
-    tape_size: usize,
     #[arg(short = 'r', long = "print-ir")]
     print_ir: bool,
 }
@@ -28,7 +26,7 @@ fn try_main() -> anyhow::Result<()> {
     if cli.print_ir {
         println!("{}", program);
     } else {
-        let tape = Tape::new(cli.tape_size);
+        let tape = Tape::new();
         let interface = Interface::new(io::stdin(), io::stdout());
         let machine = Machine::new(program, tape, interface);
         machine.run()?;

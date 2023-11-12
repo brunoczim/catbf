@@ -1,5 +1,5 @@
 use crate::ir::{Instruction, Program};
-use std::io;
+use std::{io, iter};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -18,13 +18,15 @@ pub enum Error {
 
 #[derive(Debug, Clone)]
 pub struct Tape {
-    cells: Box<[u8]>,
+    cells: Vec<u8>,
     cursor: usize,
 }
 
 impl Tape {
-    pub fn new(size: usize) -> Self {
-        Self { cells: vec![0; size].into(), cursor: 0 }
+    const CHUNK_SIZE: usize = 8192;
+
+    pub fn new() -> Self {
+        Self { cells: vec![0; Self::CHUNK_SIZE], cursor: 0 }
     }
 
     fn inc(&mut self) {
@@ -36,19 +38,27 @@ impl Tape {
     }
 
     fn next(&mut self) {
-        if self.cursor + 1 >= self.cells.len() {
-            self.cursor = 0;
-        } else {
-            self.cursor += 1;
+        self.cursor += 1;
+        if self.cursor >= self.cells.len() {
+            self.grow_next();
         }
     }
 
     fn prev(&mut self) {
         if self.cursor == 0 {
-            self.cursor = self.cells.len() - 1;
-        } else {
-            self.cursor -= 1;
+            self.grow_prev();
         }
+        self.cursor -= 1;
+    }
+
+    fn grow_next(&mut self) {
+        let new_len = self.cells.len() + Self::CHUNK_SIZE;
+        self.cells.resize(new_len, 0);
+    }
+
+    fn grow_prev(&mut self) {
+        self.cells.splice(.. 0, iter::repeat(0).take(Self::CHUNK_SIZE));
+        self.cursor += Self::CHUNK_SIZE;
     }
 
     fn input(&mut self, result: Option<u8>) {
