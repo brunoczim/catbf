@@ -16,14 +16,14 @@
 .get_growed_next:
     # arg_0 = interface
     movq %rbx, %rdi
-    # result_0 = fast_bfc_get(arg_0)
+    # return_0 = fast_bfc_get(arg_0)
     call fast_bfc_get
-    # result_0 ?= result_0
+    # return_0 ?= return_0
     testw %ax, %ax
-    # resul_t0 < 0
+    # return_0 < 0
     js .leave
-    # bswap result_0
+    # bswap return_0
     ror $8, %ax
-    # *(tape_start + tape_pos) = result_0
+    # *(tape_start + tape_pos) = return_0
     movw %ax, 0(%r12, %r14)
     ### get end

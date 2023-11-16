@@ -7,7 +7,7 @@
     movq %r12, %rdi
     # arg_1 = tape_len
     movq %r13, %rsi
-    # return_0 = fast_bfc_grow_next(arg_0, arg_1)
+    # return_0 = fast_bfc_grow_prev(arg_0, arg_1)
     call fast_bfc_grow_prev
     # tape_pos += 8192
     addq $8192, %r14

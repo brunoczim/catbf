@@ -32,7 +32,7 @@ int main(int argc, char const *argv[])
     interface.in = stdin;
     interface.out = stdout;
     tape_len = 8192;
-    tape_start = malloc(sizeof(*tape_start) * tape_len);
+    tape_start = calloc(sizeof(*tape_start), tape_len);
     result = fast_bfc_main(&interface, tape_start, tape_len);
     if (result < 0) {
         exit_code = 1;
@@ -65,12 +65,15 @@ int16_t fast_bfc_get(struct fast_bfc_interface *interface)
 
 uint8_t *fast_bfc_grow_next(uint8_t *tape_start, uint64_t tape_len)
 {
-    return realloc(tape_start, tape_len + 8192);
+    uint8_t *new_start = realloc(tape_start, tape_len + 8192);
+    memset(new_start + tape_len, 0, 8192);
+    return new_start;
 }
 
 uint8_t *fast_bfc_grow_prev(uint8_t *tape_start, uint64_t tape_len)
 {
     uint8_t *new_start = realloc(tape_start, tape_len + 8192);
     memmove(new_start + 8192, new_start, 8192);
+    memset(new_start, 0, 8192);
     return new_start;
 }
