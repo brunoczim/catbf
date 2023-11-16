@@ -7,8 +7,8 @@
     movq %r12, %rdi
     # arg_1 = tape_len
     movq %r13, %rsi
-    # return_0 = fast_bfc_grow_prev(arg_0, arg_1)
-    call fast_bfc_grow_prev
+    # return_0 = catbf_grow_prev(arg_0, arg_1)
+    call catbf_grow_prev
     # tape_pos += TAPE_CHUNK_SIZE
     addq $TAPE_CHUNK_SIZE, %r14
     # tape_start = return_0

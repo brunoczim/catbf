@@ -1,9 +1,9 @@
     .set TAPE_CHUNK_SIZE, 8192
     .text
-    .extern fast_bfc_grow_next
-    .extern fast_bfc_grow_prev
-    .extern fast_bfc_get
-    .extern fast_bfc_put
-    .globl fast_bfc_main
+    .extern catbf_grow_next
+    .extern catbf_grow_prev
+    .extern catbf_get
+    .extern catbf_put
+    .globl catbf_main
 
-fast_bfc_main:
+catbf_main:

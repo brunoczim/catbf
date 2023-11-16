@@ -1,4 +1,4 @@
-use bjaci::{
+use catbf::{
     compiler::aot,
     interpreter::{Interface, Machine, Tape},
     ir::Program,
