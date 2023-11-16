@@ -1,6 +1,6 @@
     ### next begin
     # start =? end
-    testq %r13, %r14
+    cmpq %r13, %r14
     # start == end
     jne .growed_next
     # arg_0 = tape_start
