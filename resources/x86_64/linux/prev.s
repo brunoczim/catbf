@@ -9,12 +9,12 @@
     movq %r13, %rsi
     # return_0 = fast_bfc_grow_prev(arg_0, arg_1)
     call fast_bfc_grow_prev
-    # tape_pos += 8192
-    addq $8192, %r14
+    # tape_pos += TAPE_CHUNK_SIZE
+    addq $TAPE_CHUNK_SIZE, %r14
     # tape_start = return_0
     movq %rax, %r12
-    # tape_len += 8192
-    addq $8192, %r13
+    # tape_len += TAPE_CHUNK_SIZE
+    addq $TAPE_CHUNK_SIZE, %r13
 .growed_prev:
     # tape_pos -= 1
     decq %r14

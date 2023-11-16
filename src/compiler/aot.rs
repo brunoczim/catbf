@@ -63,7 +63,7 @@ fn link(path: &mut PathBuf) -> Result<(), Error> {
 fn generate_runtime_source(path: &mut PathBuf) -> Result<(), Error> {
     path.push("runtime.c");
 
-    fs::write(&path, include_str!("../../resources/x86_64/posix/runtime.c"))
+    fs::write(&path, include_str!("../../resources/x86_64/linux/runtime.c"))
         .map_err(|error| Error::Io(path.clone(), error))?;
 
     path.pop();
@@ -81,11 +81,11 @@ fn generate_prog_asm(
         .map_err(|error| Error::Io(path.clone(), error))?;
 
     prog_file
-        .write_all(include_bytes!("../../resources/x86_64/posix/preamble.s"))
+        .write_all(include_bytes!("../../resources/x86_64/linux/preamble.s"))
         .map_err(|error| Error::Io(path.clone(), error))?;
 
     prog_file
-        .write_all(include_bytes!("../../resources/x86_64/posix/enter.s"))
+        .write_all(include_bytes!("../../resources/x86_64/linux/enter.s"))
         .map_err(|error| Error::Io(path.clone(), error))?;
 
     for (i, instruction) in program.code.iter().copied().enumerate() {
@@ -96,7 +96,7 @@ fn generate_prog_asm(
             Instruction::Halt => {
                 prog_file
                     .write_all(include_bytes!(
-                        "../../resources/x86_64/posix/halt.s"
+                        "../../resources/x86_64/linux/halt.s"
                     ))
                     .map_err(|error| Error::Io(path.clone(), error))?;
             },
@@ -104,7 +104,7 @@ fn generate_prog_asm(
             Instruction::Inc => {
                 prog_file
                     .write_all(include_bytes!(
-                        "../../resources/x86_64/posix/inc.s"
+                        "../../resources/x86_64/linux/inc.s"
                     ))
                     .map_err(|error| Error::Io(path.clone(), error))?;
             },
@@ -112,7 +112,7 @@ fn generate_prog_asm(
             Instruction::Dec => {
                 prog_file
                     .write_all(include_bytes!(
-                        "../../resources/x86_64/posix/inc.s"
+                        "../../resources/x86_64/linux/dec.s"
                     ))
                     .map_err(|error| Error::Io(path.clone(), error))?;
             },
@@ -120,7 +120,7 @@ fn generate_prog_asm(
             Instruction::Next => {
                 let label = format!(".growed_next_{}", i);
                 let content =
-                    include_str!("../../resources/x86_64/posix/next.s")
+                    include_str!("../../resources/x86_64/linux/next.s")
                         .replace(".growed_next", &label);
                 prog_file
                     .write_all(content.as_bytes())
@@ -130,7 +130,7 @@ fn generate_prog_asm(
             Instruction::Prev => {
                 let label = format!(".growed_prev_{}", i);
                 let content =
-                    include_str!("../../resources/x86_64/posix/prev.s")
+                    include_str!("../../resources/x86_64/linux/prev.s")
                         .replace(".growed_prev", &label);
                 prog_file
                     .write_all(content.as_bytes())
@@ -140,7 +140,7 @@ fn generate_prog_asm(
             Instruction::Get => {
                 let label = format!(".get_growed_next_{}", i);
                 let content =
-                    include_str!("../../resources/x86_64/posix/get.s")
+                    include_str!("../../resources/x86_64/linux/get.s")
                         .replace(".get_growed_next", &label);
                 prog_file
                     .write_all(content.as_bytes())
@@ -150,14 +150,14 @@ fn generate_prog_asm(
             Instruction::Put => {
                 prog_file
                     .write_all(include_bytes!(
-                        "../../resources/x86_64/posix/put.s"
+                        "../../resources/x86_64/linux/put.s"
                     ))
                     .map_err(|error| Error::Io(path.clone(), error))?;
             },
 
             Instruction::Jz(to_i) => {
                 let label = format!(".label_{}", to_i);
-                let content = include_str!("../../resources/x86_64/posix/jz.s")
+                let content = include_str!("../../resources/x86_64/linux/jz.s")
                     .replace(".jz_label", &label);
                 prog_file
                     .write_all(content.as_bytes())
@@ -167,7 +167,7 @@ fn generate_prog_asm(
             Instruction::Jnz(to_i) => {
                 let label = format!(".label_{}", to_i);
                 let content =
-                    include_str!("../../resources/x86_64/posix/jnz.s")
+                    include_str!("../../resources/x86_64/linux/jnz.s")
                         .replace(".jnz_label", &label);
                 prog_file
                     .write_all(content.as_bytes())
@@ -180,7 +180,7 @@ fn generate_prog_asm(
         .map_err(|error| Error::Io(path.clone(), error))?;
 
     prog_file
-        .write_all(include_bytes!("../../resources/x86_64/posix/leave.s"))
+        .write_all(include_bytes!("../../resources/x86_64/linux/leave.s"))
         .map_err(|error| Error::Io(path.clone(), error))?;
 
     path.pop();

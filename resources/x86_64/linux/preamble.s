@@ -1,3 +1,4 @@
+    .set TAPE_CHUNK_SIZE, 8192
     .text
     .extern fast_bfc_grow_next
     .extern fast_bfc_grow_prev

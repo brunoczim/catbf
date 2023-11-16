@@ -1,10 +1,10 @@
-use clap::Parser;
-use fast_bfc::{
+use bjaci::{
     compiler::aot,
     interpreter::{Interface, Machine, Tape},
     ir::Program,
     source::Source,
 };
+use clap::Parser;
 use std::{
     fs::File,
     io::{self, BufReader},

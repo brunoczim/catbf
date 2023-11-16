@@ -11,8 +11,8 @@
     call fast_bfc_grow_next
     # tape_start = return_0
     movq %rax, %r12
-    # tape_len += 8192
-    addq $8192, %r13
+    # tape_len += TAPE_CHUNK_SIZE
+    addq $TAPE_CHUNK_SIZE, %r13
 .growed_next:
     # tape_pos += 1
     incq %r14
