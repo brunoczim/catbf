@@ -16,6 +16,10 @@
     call catbf_create_tape
     # tape_len = TAPE_CHUNK_SIZE
     movq $TAPE_CHUNK_SIZE, %r13
+    # result_0 ?= null
+    test %rax, %rax
+    # result == null
+    jz .leave
     # tape_start = result_0
     movq %rax, %r12
     ### enter end

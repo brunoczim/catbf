@@ -3,7 +3,6 @@ use crate::ir::{Instruction, Program};
 use std::{
     collections::{BTreeMap, HashMap},
     io,
-    mem,
     ptr,
 };
 use thiserror::Error;
@@ -24,8 +23,6 @@ const POP_R12: [u8; 2] = [0x41, 0x5c];
 const POP_RBX: [u8; 1] = [0x5b];
 
 const MOV_RDI_TO_RBX: [u8; 3] = [0x48, 0x89, 0xfb];
-const MOV_RSI_TO_R12: [u8; 3] = [0x49, 0x89, 0xf4];
-const MOV_RDX_TO_R13: [u8; 3] = [0x49, 0x89, 0xd5];
 const MOV_R12_TO_RDI: [u8; 3] = [0x4c, 0x89, 0xe7];
 const MOV_R13_TO_RSI: [u8; 3] = [0x4c, 0x89, 0xee];
 const MOV_RAX_TO_R12: [u8; 3] = [0x49, 0x89, 0xc4];
@@ -37,6 +34,7 @@ const MOVABS_TO_RAX: [u8; 2] = [0x48, 0xb8];
 
 const CMP_R14_WITH_R13: [u8; 3] = [0x4d, 0x39, 0xee];
 const TEST_R14_WITH_R14: [u8; 3] = [0x4d, 0x85, 0xf6];
+const TEST_RAX_WITH_RAX: [u8; 3] = [0x48, 0x85, 0xc0];
 const TEST_AX_WITH_AX: [u8; 3] = [0x66, 0x85, 0xc0];
 const TEST_AL_WITH_AL: [u8; 2] = [0x84, 0xc0];
 
@@ -49,6 +47,7 @@ const CALL_ABS_RAX: [u8; 1] = [0xff];
 const XOR_R14_TO_R14: [u8; 3] = [0x4d, 0x31, 0xf6];
 const XOR_EAX_TO_EAX: [u8; 2] = [0x31, 0xc0];
 
+const MOV_IMM32_TO_R13: [u8; 3] = [0x49, 0xc7, 0xc5];
 const ADD_IMM32_TO_R13: [u8; 3] = [0x49, 0x81, 0xc5];
 const ADD_IMM32_TO_R14: [u8; 3] = [0x49, 0x81, 0xc6];
 
@@ -113,12 +112,6 @@ impl Executable {
         W: io::Write + Send + Sync + 'static,
     {
         let interface = Interface::new(input, output);
-        let tape = unsafe {
-            libc::calloc(runtime::TAPE_CHUNK_SIZE, mem::size_of::<u8>())
-        };
-        if tape.is_null() {
-            Err(io::Error::last_os_error())?;
-        }
         Ok(())
     }
 }
@@ -129,16 +122,6 @@ impl Drop for Executable {
             libc::free(self.buf);
         }
     }
-}
-
-fn write_absolute_call(
-    buf: &mut Vec<u8>,
-    func_ptr: *const u8,
-) -> Result<(), Error> {
-    buf.extend(MOVABS_TO_RAX);
-    buf.extend((func_ptr as usize as u64).to_le_bytes());
-    buf.extend(CALL_ABS_RAX);
-    Ok(())
 }
 
 #[derive(Debug, Clone)]
@@ -159,11 +142,15 @@ impl Compiler {
 
     pub fn first_pass(&mut self, program: &Program) {
         let last_ir_label = program.code.len();
+        self.write_enter(last_ir_label);
+
         for (ir_label, instr) in program.code.iter().enumerate() {
             self.def_main_label(ir_label);
             self.handle_instruction(ir_label, *instr, last_ir_label);
         }
+
         self.def_main_label(last_ir_label);
+        self.write_leave(last_ir_label);
     }
 
     pub fn second_pass(&mut self) -> Result<(), Error> {
@@ -189,8 +176,8 @@ impl Compiler {
         match instr {
             Instruction::Inc => self.write_inc(),
             Instruction::Dec => self.write_dec(),
-            Instruction::Next => self.write_next(ir_label),
-            Instruction::Prev => self.write_prev(ir_label),
+            Instruction::Next => self.write_next(ir_label, last_ir_label),
+            Instruction::Prev => self.write_prev(ir_label, last_ir_label),
             Instruction::Get => self.write_get(ir_label, last_ir_label),
             Instruction::Put => self.write_put(last_ir_label),
             Instruction::Jz(target_ir_label) => self.write_jz(target_ir_label),
@@ -199,6 +186,13 @@ impl Compiler {
             },
             Instruction::Halt => self.write_halt(last_ir_label),
         }
+    }
+
+    pub fn write<I>(&mut self, bytes: I)
+    where
+        I: IntoIterator<Item = u8>,
+    {
+        self.buf.extend(bytes);
     }
 
     pub fn def_main_label(&mut self, ir_label: usize) {
@@ -211,118 +205,134 @@ impl Compiler {
 
     pub fn make_placeholder(&mut self, ir_label: usize, sub_label: usize) {
         self.placeholders.insert(self.buf.len(), (ir_label, sub_label));
-        self.buf.extend(0u32.to_le_bytes());
+        self.write(0u32.to_le_bytes());
     }
 
     pub fn call_absolute(&mut self, func_ptr: *const u8) {
-        self.buf.extend(MOVABS_TO_RAX);
-        self.buf.extend((func_ptr as usize as u64).to_le_bytes());
-        self.buf.extend(CALL_ABS_RAX);
+        self.write(MOVABS_TO_RAX);
+        self.write((func_ptr as usize as u64).to_le_bytes());
+        self.write(CALL_ABS_RAX);
     }
 
-    pub fn write_enter(&mut self) {
-        self.buf.extend(PUSH_RBX);
-        self.buf.extend(PUSH_R12);
-        self.buf.extend(PUSH_R13);
-        self.buf.extend(PUSH_R14);
-        self.buf.extend(MOV_RDI_TO_RBX);
-        self.buf.extend(MOV_RSI_TO_R12);
-        self.buf.extend(MOV_RDX_TO_R13);
-        self.buf.extend(XOR_R14_TO_R14);
+    pub fn write_enter(&mut self, last_ir_label: usize) {
+        self.write(PUSH_R14);
+        self.write(PUSH_R13);
+        self.write(PUSH_R12);
+        self.write(PUSH_RBX);
+        self.write(MOV_RDI_TO_RBX);
+        self.write(XOR_R14_TO_R14);
+        self.call_absolute(runtime::create_tape as *const u8);
+        self.write(TEST_RAX_WITH_RAX);
+        self.write(JE_JZ_REL32);
+        self.make_placeholder(last_ir_label, 1);
+        self.write(MOV_IMM32_TO_R13);
+        self.write((runtime::TAPE_CHUNK_SIZE as u32).to_le_bytes());
+        self.write(MOV_RAX_TO_R12);
     }
 
     pub fn write_leave(&mut self, ir_label: usize) {
-        self.buf.extend(XOR_EAX_TO_EAX);
+        self.write(XOR_EAX_TO_EAX);
         self.def_label(ir_label, 1);
-        self.buf.extend(POP_R14);
-        self.buf.extend(POP_R13);
-        self.buf.extend(POP_R12);
-        self.buf.extend(POP_RBX);
-        self.buf.extend(RET);
+        self.write(MOV_R12_TO_RDI);
+        self.call_absolute(runtime::destroy_tape as *const u8);
+        self.write(POP_RBX);
+        self.write(POP_R12);
+        self.write(POP_R13);
+        self.write(POP_R14);
+        self.write(RET);
     }
 
     pub fn write_inc(&mut self) {
-        self.buf.extend(INCB_MEM_R12_R14);
+        self.write(INCB_MEM_R12_R14);
     }
 
     pub fn write_dec(&mut self) {
-        self.buf.extend(DECB_MEM_R12_R14);
+        self.write(DECB_MEM_R12_R14);
     }
 
-    pub fn write_next(&mut self, ir_label: usize) {
-        self.buf.extend(CMP_R14_WITH_R13);
-        self.buf.extend(JNE_JNZ_REL32);
+    pub fn write_next(&mut self, ir_label: usize, last_ir_label: usize) {
+        self.write(CMP_R14_WITH_R13);
+        self.write(JNE_JNZ_REL32);
         self.make_placeholder(ir_label, 1);
-        self.buf.extend(MOV_R12_TO_RDI);
-        self.buf.extend(MOV_R13_TO_RSI);
+        self.write(MOV_R12_TO_RDI);
+        self.write(MOV_R13_TO_RSI);
         self.call_absolute(runtime::grow_next as *const u8);
-        self.buf.extend(MOV_RAX_TO_R12);
-        self.buf.extend(ADD_IMM32_TO_R13);
-        self.buf.extend((runtime::TAPE_CHUNK_SIZE as u32).to_le_bytes());
+        self.write(TEST_RAX_WITH_RAX);
+        self.write(JE_JZ_REL32);
+        self.make_placeholder(last_ir_label, 1);
+        self.write(MOV_RAX_TO_R12);
+        self.write(ADD_IMM32_TO_R13);
+        self.write((runtime::TAPE_CHUNK_SIZE as u32).to_le_bytes());
         self.def_label(ir_label, 1);
-        self.buf.extend(INC_R14);
+        self.write(INC_R14);
     }
 
-    pub fn write_prev(&mut self, ir_label: usize) {
-        self.buf.extend(TEST_R14_WITH_R14);
-        self.buf.extend(JNE_JNZ_REL32);
+    pub fn write_prev(&mut self, ir_label: usize, last_ir_label: usize) {
+        self.write(TEST_R14_WITH_R14);
+        self.write(JNE_JNZ_REL32);
         self.make_placeholder(ir_label, 1);
-        self.buf.extend(MOV_R12_TO_RDI);
-        self.buf.extend(MOV_R13_TO_RSI);
+        self.write(MOV_R12_TO_RDI);
+        self.write(MOV_R13_TO_RSI);
         self.call_absolute(runtime::grow_prev as *const u8);
-        self.buf.extend(ADD_IMM32_TO_R14);
-        self.buf.extend((runtime::TAPE_CHUNK_SIZE as u32).to_le_bytes());
-        self.buf.extend(MOV_RAX_TO_R12);
-        self.buf.extend(ADD_IMM32_TO_R13);
-        self.buf.extend((runtime::TAPE_CHUNK_SIZE as u32).to_le_bytes());
+        self.write(TEST_RAX_WITH_RAX);
+        self.write(JE_JZ_REL32);
+        self.make_placeholder(last_ir_label, 1);
+        self.write(ADD_IMM32_TO_R14);
+        self.write((runtime::TAPE_CHUNK_SIZE as u32).to_le_bytes());
+        self.write(MOV_RAX_TO_R12);
+        self.write(ADD_IMM32_TO_R13);
+        self.write((runtime::TAPE_CHUNK_SIZE as u32).to_le_bytes());
         self.def_label(ir_label, 1);
-        self.buf.extend(DEC_R14);
+        self.write(DEC_R14);
     }
 
     pub fn write_put(&mut self, last_ir_label: usize) {
-        self.buf.extend(MOV_RBX_TO_RDI);
-        self.buf.extend(XOR_EAX_TO_EAX);
-        self.buf.extend(MOV_MEM_R12_R14_TO_AL);
-        self.buf.extend(MOV_AX_TO_SI);
+        self.write(MOV_RBX_TO_RDI);
+        self.write(XOR_EAX_TO_EAX);
+        self.write(MOV_MEM_R12_R14_TO_AL);
+        self.write(MOV_AX_TO_SI);
         self.call_absolute(runtime::put as *const u8);
-        self.buf.extend(TEST_AL_WITH_AL);
-        self.buf.extend(JS_REL32);
+        self.write(TEST_AL_WITH_AL);
+        self.write(JS_REL32);
         self.make_placeholder(last_ir_label, 1);
     }
 
     pub fn write_get(&mut self, ir_label: usize, last_ir_label: usize) {
-        self.buf.extend(CMP_R14_WITH_R13);
-        self.buf.extend(JNE_JNZ_REL32);
+        self.write(CMP_R14_WITH_R13);
+        self.write(JNE_JNZ_REL32);
         self.make_placeholder(ir_label, 1);
-        self.buf.extend(MOV_R12_TO_RDI);
-        self.buf.extend(MOV_R13_TO_RSI);
+        self.write(MOV_R12_TO_RDI);
+        self.write(MOV_R13_TO_RSI);
         self.call_absolute(runtime::grow_next as *const u8);
-        self.buf.extend(MOV_RAX_TO_R12);
-        self.buf.extend(ADD_IMM32_TO_R13);
-        self.buf.extend((runtime::TAPE_CHUNK_SIZE as u32).to_le_bytes());
-        self.def_label(ir_label, 1);
-        self.buf.extend(MOV_RBX_TO_RDI);
-        self.call_absolute(runtime::get as *const u8);
-        self.buf.extend(TEST_AX_WITH_AX);
-        self.buf.extend(JS_REL32);
+        self.write(TEST_RAX_WITH_RAX);
+        self.write(JE_JZ_REL32);
         self.make_placeholder(last_ir_label, 1);
-        self.buf.extend(ROR_IMM8_TO_AX);
-        self.buf.extend(8u8.to_le_bytes());
-        self.buf.extend(MOV_AX_TO_MEM_R12_R14);
+        self.write(MOV_RAX_TO_R12);
+        self.write(ADD_IMM32_TO_R13);
+        self.write((runtime::TAPE_CHUNK_SIZE as u32).to_le_bytes());
+        self.def_label(ir_label, 1);
+        self.write(MOV_RBX_TO_RDI);
+        self.call_absolute(runtime::get as *const u8);
+        self.write(TEST_AX_WITH_AX);
+        self.write(JS_REL32);
+        self.make_placeholder(last_ir_label, 1);
+        self.write(ROR_IMM8_TO_AX);
+        self.write(8u8.to_le_bytes());
+        self.write(MOV_AX_TO_MEM_R12_R14);
     }
 
     pub fn write_halt(&mut self, last_ir_label: usize) {
-        self.buf.extend(JMP_REL32);
+        self.write(JMP_REL32);
         self.make_placeholder(last_ir_label, 0);
     }
 
     pub fn write_jz(&mut self, target_ir_label: usize) {
-        self.buf.extend(JE_JZ_REL32);
+        self.write(JE_JZ_REL32);
         self.make_placeholder(target_ir_label, 0);
     }
 
     pub fn write_jnz(&mut self, target_ir_label: usize) {
-        self.buf.extend(JNE_JNZ_REL32);
+        self.write(JNE_JNZ_REL32);
         self.make_placeholder(target_ir_label, 0);
     }
 }

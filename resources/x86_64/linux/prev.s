@@ -9,6 +9,10 @@
     movq %r13, %rsi
     # return_0 = catbf_grow_prev(arg_0, arg_1)
     call catbf_grow_prev
+    # result_0 ?= null
+    test %rax, %rax
+    # result == null
+    jz .leave
     # tape_pos += TAPE_CHUNK_SIZE
     addq $TAPE_CHUNK_SIZE, %r14
     # tape_start = return_0

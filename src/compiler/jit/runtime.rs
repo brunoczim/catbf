@@ -1,4 +1,4 @@
-use std::io;
+use std::{io, mem};
 
 pub const TAPE_CHUNK_SIZE: usize = 8192;
 
@@ -32,6 +32,14 @@ pub unsafe extern "sysv64" fn get(interface: *mut Interface) -> i16 {
         Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => 0,
         Err(_) => -1,
     }
+}
+
+pub unsafe extern "sysv64" fn create_tape() -> *mut u8 {
+    libc::calloc(TAPE_CHUNK_SIZE, mem::size_of::<u8>()) as *mut u8
+}
+
+pub unsafe extern "sysv64" fn destroy_tape(tape: *mut u8) {
+    libc::free(tape as *mut libc::c_void)
 }
 
 pub unsafe extern "sysv64" fn grow_next(
