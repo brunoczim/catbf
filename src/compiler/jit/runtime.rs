@@ -10,8 +10,8 @@ pub struct Interface {
 impl Interface {
     pub fn new<R, W>(input: R, output: W) -> Self
     where
-        R: io::Read + Send + Sync,
-        W: io::Write + Send + Sync,
+        R: io::Read + Send + Sync + 'static,
+        W: io::Write + Send + Sync + 'static,
     {
         Self { input: Box::new(input), output: Box::new(output) }
     }

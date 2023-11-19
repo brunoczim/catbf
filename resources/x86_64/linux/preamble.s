@@ -1,5 +1,7 @@
     .set TAPE_CHUNK_SIZE, 8192
     .text
+    .extern catbf_create_tape
+    .extern catbf_destroy_tape
     .extern catbf_grow_next
     .extern catbf_grow_prev
     .extern catbf_get

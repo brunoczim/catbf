@@ -3,9 +3,15 @@
     # return_0 = 0
     xorl %eax, %eax
 .leave:
-    popq %r14
-    popq %r13
+    # arg_0 = tape_start
+    movq %r12, %rdi
+    # catbf_detroy_tape(tape_start)
+    call catbf_destroy_tape
+    # restore registers
     popq %r12
+    popq %r13
+    popq %r14
     popq %rbx
+    # return to caller
     ret
     ### leave end

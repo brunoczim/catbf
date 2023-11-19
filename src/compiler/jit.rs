@@ -1,5 +1,11 @@
+use self::runtime::Interface;
 use crate::ir::{Instruction, Program};
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    io,
+    mem,
+    ptr,
+};
 use thiserror::Error;
 
 mod runtime;
@@ -56,18 +62,6 @@ const DECB_MEM_R12_R14: [u8; 4] = [0x43, 0xfe, 0x0c, 0x34];
 
 const RET: [u8; 1] = [0xc3];
 
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("target is unsupported for Just-In-Time compilation")]
-    UnsupportedTarget,
-    #[error("label index {} is out of bounds", .0)]
-    BadLabelIndex(usize),
-    #[error("could not allocate memory for just in time compilation")]
-    AllocError,
-}
-
-pub struct Executable;
-
 pub fn compile(program: &Program) -> Result<Executable, Error> {
     if !TARGET_SUPPORTED {
         Err(Error::UnsupportedTarget)?;
@@ -78,7 +72,63 @@ pub fn compile(program: &Program) -> Result<Executable, Error> {
     compiler.first_pass(program);
     compiler.second_pass()?;
 
-    todo!()
+    unsafe { Executable::new(&compiler.buf[..]) }
+}
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("target is unsupported for Just-In-Time compilation")]
+    UnsupportedTarget,
+    #[error("label index {} is out of bounds", .0)]
+    BadLabelIndex(usize),
+    #[error("could not allocate memory for just in time compilation: {}", .0)]
+    AllocError(io::Error),
+    #[error("error setting permission for executable memory: {}", .0)]
+    Permission(io::Error),
+}
+
+#[derive(Debug)]
+pub struct Executable {
+    buf: *mut libc::c_void,
+}
+
+impl Executable {
+    unsafe fn new(buf: &[u8]) -> Result<Self, Error> {
+        let page_size = libc::sysconf(libc::_SC_PAGESIZE) as usize;
+        let len = buf.len() as libc::size_t;
+        let mut ptr = ptr::null_mut();
+        if libc::posix_memalign(&mut ptr, page_size, len) != 0 {
+            Err(Error::AllocError(io::Error::last_os_error()))?;
+        }
+        libc::memcpy(ptr, buf.as_ptr() as *mut libc::c_void, len);
+        if libc::mprotect(ptr, len, libc::PROT_EXEC | libc::PROT_READ) < 0 {
+            Err(Error::Permission(io::Error::last_os_error()))?;
+        }
+        Ok(Self { buf: ptr })
+    }
+
+    pub fn run<R, W>(&mut self, input: R, output: W) -> io::Result<()>
+    where
+        R: io::Read + Send + Sync + 'static,
+        W: io::Write + Send + Sync + 'static,
+    {
+        let interface = Interface::new(input, output);
+        let tape = unsafe {
+            libc::calloc(runtime::TAPE_CHUNK_SIZE, mem::size_of::<u8>())
+        };
+        if tape.is_null() {
+            Err(io::Error::last_os_error())?;
+        }
+        Ok(())
+    }
+}
+
+impl Drop for Executable {
+    fn drop(&mut self) {
+        unsafe {
+            libc::free(self.buf);
+        }
+    }
 }
 
 fn write_absolute_call(
