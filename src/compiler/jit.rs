@@ -3,6 +3,7 @@ use crate::ir::{Instruction, Program};
 use std::{
     collections::{BTreeMap, HashMap},
     io,
+    mem::transmute,
     ptr,
 };
 use thiserror::Error;
@@ -106,12 +107,21 @@ impl Executable {
         Ok(Self { buf: ptr })
     }
 
-    pub fn run<R, W>(&mut self, input: R, output: W) -> io::Result<()>
+    pub fn run<R, W>(&self, input: R, output: W) -> io::Result<()>
     where
         R: io::Read + Send + Sync + 'static,
         W: io::Write + Send + Sync + 'static,
     {
-        let interface = Interface::new(input, output);
+        let mut interface = Interface::new(input, output);
+
+        let status = unsafe {
+            let main: unsafe fn(*mut Interface) -> i8 = transmute(self.buf);
+            main(&mut interface)
+        };
+
+        if status < 0 {
+            Err(io::Error::last_os_error())?;
+        }
         Ok(())
     }
 }
