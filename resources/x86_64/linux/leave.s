@@ -7,6 +7,5 @@
     popq %r13
     popq %r12
     popq %rbx
-    popq %rbp
     ret
     ### leave end

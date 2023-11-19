@@ -1,5 +1,4 @@
     ### enter begin
-    pushq %rbp
     # interface: *mut interface
     pushq %rbx
     # tape_start: *mut u8

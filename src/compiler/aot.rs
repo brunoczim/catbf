@@ -7,6 +7,9 @@ use std::{
 };
 use thiserror::Error;
 
+pub const TARGET_SUPPORTED: bool =
+    cfg!(all(target_os = "linux", target_arch = "x86_64"));
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("target is unsupported for Ahead-Of-Time compilation")]
@@ -16,8 +19,6 @@ pub enum Error {
     #[error("{}: {}", .0.display(), .1)]
     Io(PathBuf, io::Error),
 }
-
-pub const TARGET_SUPPORTED: bool = cfg!(all(unix, target_arch = "x86_64"));
 
 pub fn compile<P>(program: &Program, directory: P) -> Result<(), Error>
 where
