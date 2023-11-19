@@ -94,16 +94,22 @@ pub struct Executable {
 
 impl Executable {
     unsafe fn new(buf: &[u8]) -> Result<Self, Error> {
-        let page_size = libc::sysconf(libc::_SC_PAGESIZE) as usize;
+        let page_size = libc::sysconf(libc::_SC_PAGESIZE) as libc::size_t;
         let len = buf.len() as libc::size_t;
+        let ceiled_len = len + (page_size - len % page_size) % page_size;
+
         let mut ptr = ptr::null_mut();
-        if libc::posix_memalign(&mut ptr, page_size, len) != 0 {
-            Err(Error::AllocError(io::Error::last_os_error()))?;
+        let code = libc::posix_memalign(&mut ptr, page_size, ceiled_len);
+        if code != 0 {
+            Err(Error::AllocError(io::Error::from_raw_os_error(code)))?;
         }
-        libc::memcpy(ptr, buf.as_ptr() as *mut libc::c_void, len);
-        if libc::mprotect(ptr, len, libc::PROT_EXEC | libc::PROT_READ) < 0 {
+        libc::memcpy(ptr, buf.as_ptr() as *const libc::c_void, len);
+
+        let protection = libc::PROT_EXEC | libc::PROT_READ;
+        if libc::mprotect(ptr, ceiled_len, protection) < 0 {
             Err(Error::Permission(io::Error::last_os_error()))?;
         }
+
         Ok(Self { buf: ptr })
     }
 

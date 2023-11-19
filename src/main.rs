@@ -52,7 +52,6 @@ fn try_main() -> anyhow::Result<()> {
             machine.run()?;
         }
     }
-
     Ok(())
 }
 
