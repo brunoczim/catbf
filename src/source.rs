@@ -1,6 +1,7 @@
-//! Utilities to help emitting reasonable information in parse error messages.
+//! Utilities to help tracking source code locations and emitting reasonable
+//! information in parse error messages.
 
-use std::{convert::Infallible, fmt, io, iter, slice};
+use std::{fmt, io};
 
 /// Location of an object in the source code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -41,90 +42,40 @@ impl fmt::Display for Location {
     }
 }
 
-pub type IoSource<R> = Source<io::Bytes<R>>;
-
-pub type InfallibleSource<I> =
-    Source<iter::Map<I, fn(u8) -> Result<u8, Infallible>>>;
-
-pub type BufSource<'buf> =
-    InfallibleSource<iter::Copied<slice::Iter<'buf, u8>>>;
-
-#[derive(Debug, Clone)]
-pub struct Source<I> {
-    iterator: I,
+#[derive(Debug)]
+pub struct Source<R> {
+    bytes: io::Bytes<R>,
     curr_location: Location,
 }
 
-impl<R> IoSource<R>
+impl<R> Source<R>
 where
     R: io::Read,
 {
-    pub fn from_reader(reader: R) -> Self {
-        Self::new(reader.bytes())
+    pub fn new(reader: R) -> Self {
+        Self { bytes: reader.bytes(), curr_location: Location::START }
     }
 }
 
-impl<R> From<R> for IoSource<R>
+impl<R> From<R> for Source<R>
 where
     R: io::Read,
 {
     fn from(reader: R) -> Self {
-        Self::from_reader(reader)
+        Self::new(reader)
     }
 }
 
-impl<I> InfallibleSource<I>
+impl<R> Source<R>
 where
-    I: Iterator<Item = u8>,
+    R: io::Read,
 {
-    pub fn from_infallible<T>(iterable: T) -> Self
-    where
-        T: IntoIterator<IntoIter = I>,
-    {
-        Self::new(
-            iterable.into_iter().map(Ok as fn(u8) -> Result<u8, Infallible>),
-        )
-    }
-}
-
-impl<I> From<I> for InfallibleSource<I>
-where
-    I: Iterator<Item = u8>,
-{
-    fn from(iterable: I) -> Self {
-        Self::from_infallible(iterable)
-    }
-}
-
-impl<'buf> BufSource<'buf> {
-    pub fn from_buf(buf: &'buf [u8]) -> Self {
-        Self::from_infallible(buf.iter().copied())
-    }
-}
-
-impl<'buf> From<&'buf [u8]> for BufSource<'buf> {
-    fn from(buf: &'buf [u8]) -> Self {
-        Self::from_buf(buf)
-    }
-}
-
-impl<I, E> Source<I>
-where
-    I: Iterator<Item = Result<u8, E>>,
-{
-    pub fn new<T>(iterable: T) -> Self
-    where
-        T: IntoIterator<IntoIter = I>,
-    {
-        Self { iterator: iterable.into_iter(), curr_location: Location::START }
-    }
-
     pub fn curr_location(&self) -> Location {
         self.curr_location
     }
 
-    pub fn try_next(&mut self) -> Result<Option<(u8, Location)>, E> {
-        let Some(byte) = self.iterator.next().transpose()? else {
+    pub fn try_next(&mut self) -> io::Result<Option<(u8, Location)>> {
+        let Some(byte) = self.bytes.next().transpose()? else {
             return Ok(None);
         };
 
@@ -134,23 +85,11 @@ where
     }
 }
 
-impl<I> Source<I>
+impl<R> Iterator for Source<R>
 where
-    I: Iterator<Item = Result<u8, Infallible>>,
+    R: io::Read,
 {
-    pub fn next_infallible(&mut self) -> Option<(u8, Location)> {
-        match self.try_next() {
-            Ok(item) => item,
-            Err(error) => match error {},
-        }
-    }
-}
-
-impl<I, E> Iterator for Source<I>
-where
-    I: Iterator<Item = Result<u8, E>>,
-{
-    type Item = Result<(u8, Location), E>;
+    type Item = io::Result<(u8, Location)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.try_next().transpose()

@@ -1,13 +1,13 @@
 //! Intermediate Representation (IR) of Brainfuck programs.
 
 use crate::source::{Location, Source};
-use std::{collections::HashSet, error::Error, fmt};
+use std::{collections::HashSet, fmt, io};
 use thiserror::Error;
 
-#[derive(Debug, Clone, Error)]
-pub enum ParseError<E: Error> {
-    #[error("input error: {}", .0)]
-    InputError(#[from] E),
+#[derive(Debug, Error)]
+pub enum ParseError {
+    #[error("IO error during parse: {}", .0)]
+    IoError(#[from] io::Error),
     #[error("unmatched `[`, written at {}", .0)]
     UnmatchedLoopOpen(Location),
     #[error("unmatched `]`, written at {}", .0)]
@@ -64,10 +64,9 @@ pub struct Program {
 impl Program {
     /// Parses from the given source code reader, yielding a program in the IR
     /// format.
-    pub fn parse<I, E>(mut source: Source<I>) -> Result<Self, ParseError<E>>
+    pub fn parse<R>(mut source: Source<R>) -> Result<Self, ParseError>
     where
-        I: Iterator<Item = Result<u8, E>>,
-        E: Error,
+        R: io::Read,
     {
         let mut code = Vec::new();
         let mut loop_starts = Vec::new();

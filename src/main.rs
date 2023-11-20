@@ -44,7 +44,7 @@ struct Cli {
 fn try_main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let reader = BufReader::new(File::open(cli.path)?);
-    let source = Source::from_reader(reader);
+    let source = Source::new(reader);
     let program = Program::parse(source)?;
     if cli.print_ir {
         println!("{}", program);
