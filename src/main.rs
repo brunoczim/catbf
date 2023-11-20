@@ -16,8 +16,8 @@ use std::{
 /// compiler and Just-In-Time (JIT) compiler.
 ///
 /// The tape is "infinite" both forwards and backwards. Cells are 8-bit. Get
-/// from stdin writes to two cells: the first is a "boolean" indicating whether
-/// a byte was read (false = EOF), the secon second is the byte read.
+/// from stdin writes to two cells: the first one is a "boolean" indicating
+/// whether a byte was read (false = EOF), the second one is the byte read.
 #[derive(Debug, Clone, Parser)]
 struct Cli {
     /// Source file path.
