@@ -1,3 +1,5 @@
+//! Basic Brainfuck interpreter.
+
 use crate::ir::{Instruction, Program};
 use std::{io, iter};
 use thiserror::Error;
@@ -16,6 +18,7 @@ pub enum Error {
     Io(#[from] io::Error),
 }
 
+/// A tape allocated for the interpreter.
 #[derive(Debug, Clone)]
 pub struct Tape {
     cells: Vec<u8>,
@@ -51,11 +54,13 @@ impl Tape {
         self.cursor -= 1;
     }
 
+    /// Grows the tape by a chunk (currently 8k) forwards.
     fn grow_next(&mut self) {
         let new_len = self.cells.len() + Self::CHUNK_SIZE;
         self.cells.resize(new_len, 0);
     }
 
+    /// Grows the tape by a chunk (currently 8k) backwards.
     fn grow_prev(&mut self) {
         self.cells.splice(.. 0, iter::repeat(0).take(Self::CHUNK_SIZE));
         self.cursor += Self::CHUNK_SIZE;

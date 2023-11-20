@@ -1,3 +1,5 @@
+//! Intermediate Representation (IR) of Brainfuck programs.
+
 use crate::source::{Location, Source};
 use std::{collections::HashSet, error::Error, fmt};
 use thiserror::Error;
@@ -14,14 +16,25 @@ pub enum ParseError<E: Error> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Instruction {
+    /// Inserted when a Brainfuck program reaches its end.
     Halt,
+    /// Inserted when a `+` is found. Increments the cell.
     Inc,
+    /// Inserted when a `-` is found. Decrements the cell.
     Dec,
+    /// Inserted when a `>` is found. Advances the tape.
     Next,
+    /// Inserted when a `<` is found. Retracts the tape.
     Prev,
-    Put,
+    /// Inserted when a `,` is found. Gets a byte from the stdin.
     Get,
+    /// Inserted when a `.` is found. Puts a byte into the stdout.
+    Put,
+    /// Jumps to the given absolute instruction index when the current cell is
+    /// zero. Equivalent to `[`.
     Jz(usize),
+    /// Jumps to the given absolute instruction index when the current cell is
+    /// not zero. Equivalent to `]`.
     Jnz(usize),
 }
 
@@ -41,12 +54,16 @@ impl fmt::Display for Instruction {
     }
 }
 
+/// A complete Brainfuck program in the IR format.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Program {
+    /// Serial list of instructions.
     pub code: Vec<Instruction>,
 }
 
 impl Program {
+    /// Parses from the given source code reader, yielding a program in the IR
+    /// format.
     pub fn parse<I, E>(mut source: Source<I>) -> Result<Self, ParseError<E>>
     where
         I: Iterator<Item = Result<u8, E>>,

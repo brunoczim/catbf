@@ -1,9 +1,15 @@
+//! Utilities to help emitting reasonable information in parse error messages.
+
 use std::{convert::Infallible, fmt, io, iter, slice};
 
+/// Location of an object in the source code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Location {
+    /// Absolute bytewise position.
     pub position: u64,
+    /// Line number.
     pub line: u64,
+    /// Column bytewise number.
     pub column: u64,
 }
 
@@ -14,8 +20,10 @@ impl Default for Location {
 }
 
 impl Location {
+    /// Location of the beginning of the the source file.
     pub const START: Self = Self { position: 0, line: 1, column: 1 };
 
+    /// Advances the location given the current byte.
     pub fn next(&mut self, byte: u8) {
         self.position += 1;
         if byte == b'\n' {
