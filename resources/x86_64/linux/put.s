@@ -10,5 +10,5 @@
     # return_0 ?= return_0
     testb %al, %al
     # result0 < 0
-    js .leave
+    js .failure
     ### put end

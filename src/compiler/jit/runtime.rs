@@ -50,7 +50,7 @@ pub unsafe extern "sysv64" fn grow_next(
     let new_start =
         libc::realloc(tape_start as *mut libc::c_void, new_len) as *mut u8;
     if new_start.is_null() {
-        panic!("could not reallocate tape");
+        return new_start;
     }
     libc::memset(
         new_start.add(tape_len) as *mut libc::c_void,
@@ -68,7 +68,7 @@ pub unsafe extern "sysv64" fn grow_prev(
     let new_start =
         libc::realloc(tape_start as *mut libc::c_void, new_len) as *mut u8;
     if new_start.is_null() {
-        panic!("could not reallocate tape");
+        return new_start;
     }
     libc::memmove(
         new_start.add(TAPE_CHUNK_SIZE) as *mut libc::c_void,

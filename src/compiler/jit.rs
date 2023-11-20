@@ -28,8 +28,9 @@ const MOV_R12_TO_RDI: [u8; 3] = [0x4c, 0x89, 0xe7];
 const MOV_R13_TO_RSI: [u8; 3] = [0x4c, 0x89, 0xee];
 const MOV_RAX_TO_R12: [u8; 3] = [0x49, 0x89, 0xc4];
 const MOV_RBX_TO_RDI: [u8; 3] = [0x48, 0x89, 0xdf];
-const MOV_AX_TO_SI: [u8; 3] = [0x66, 0x89, 0xc9];
+const MOV_AX_TO_SI: [u8; 3] = [0x66, 0x89, 0xc6];
 const MOV_AX_TO_MEM_R12_R14: [u8; 5] = [0x66, 0x43, 0x89, 0x04, 0x34];
+const MOV_R14B_TO_AL: [u8; 3] = [0x44, 0x88, 0xf0];
 const MOV_MEM_R12_R14_TO_AL: [u8; 4] = [0x43, 0x8a, 0x04, 0x34];
 const MOVABS_TO_RAX: [u8; 2] = [0x48, 0xb8];
 
@@ -43,12 +44,14 @@ const JMP_REL32: [u8; 1] = [0xe9];
 const JE_JZ_REL32: [u8; 2] = [0x0f, 0x84];
 const JNE_JNZ_REL32: [u8; 2] = [0x0f, 0x85];
 const JS_REL32: [u8; 2] = [0x0f, 0x88];
-const CALL_ABS_RAX: [u8; 1] = [0xff];
+const CALL_ABS_RAX: [u8; 2] = [0xff, 0xd0];
 
 const XOR_R14_TO_R14: [u8; 3] = [0x4d, 0x31, 0xf6];
 const XOR_EAX_TO_EAX: [u8; 2] = [0x31, 0xc0];
+const XOR_R14B_TO_R14B: [u8; 3] = [0x45, 0x30, 0xf6];
 
 const MOV_IMM32_TO_R13: [u8; 3] = [0x49, 0xc7, 0xc5];
+const MOV_IMM8_TO_R14B: [u8; 2] = [0x41, 0xb6];
 const ADD_IMM32_TO_R13: [u8; 3] = [0x49, 0x81, 0xc5];
 const ADD_IMM32_TO_R14: [u8; 3] = [0x49, 0x81, 0xc6];
 
@@ -71,13 +74,6 @@ pub fn compile(program: &Program) -> Result<Executable, Error> {
 
     compiler.first_pass(program);
     compiler.second_pass()?;
-
-    for chunk in compiler.buf.chunks(4) {
-        for byte in chunk.iter().copied() {
-            print!("{:02x} ", byte);
-        }
-        println!();
-    }
 
     unsafe { Executable::new(&compiler.buf[..]) }
 }
@@ -183,7 +179,10 @@ impl Compiler {
             else {
                 Err(Error::BadLabelIndex(*ir_label))?
             };
-            let label_buf = (*label as u32).to_le_bytes();
+            let from = (placeholder_label + 4) as i64;
+            let to = *label as i64;
+            let distance = to.wrapping_sub(from) as u32;
+            let label_buf = distance.to_le_bytes();
             self.buf[*placeholder_label .. *placeholder_label + 4]
                 .copy_from_slice(&label_buf[..]);
         }
@@ -254,10 +253,16 @@ impl Compiler {
     }
 
     pub fn write_leave(&mut self, ir_label: usize) {
-        self.write(XOR_EAX_TO_EAX);
+        self.write(XOR_R14B_TO_R14B);
+        self.write(JMP_REL32);
+        self.make_placeholder(ir_label, 2);
         self.def_label(ir_label, 1);
+        self.write(MOV_IMM8_TO_R14B);
+        self.write((-1i8).to_le_bytes());
+        self.def_label(ir_label, 2);
         self.write(MOV_R12_TO_RDI);
         self.call_absolute(runtime::destroy_tape as *const u8);
+        self.write(MOV_R14B_TO_AL);
         self.write(POP_RBX);
         self.write(POP_R12);
         self.write(POP_R13);
@@ -350,11 +355,15 @@ impl Compiler {
     }
 
     pub fn write_jz(&mut self, target_ir_label: usize) {
+        self.write(MOV_MEM_R12_R14_TO_AL);
+        self.write(TEST_AL_WITH_AL);
         self.write(JE_JZ_REL32);
         self.make_placeholder(target_ir_label, 0);
     }
 
     pub fn write_jnz(&mut self, target_ir_label: usize) {
+        self.write(MOV_MEM_R12_R14_TO_AL);
+        self.write(TEST_AL_WITH_AL);
         self.write(JNE_JNZ_REL32);
         self.make_placeholder(target_ir_label, 0);
     }

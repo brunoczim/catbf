@@ -12,7 +12,7 @@
     # result_0 ?= null
     test %rax, %rax
     # result == null
-    jz .leave
+    jz .failure
     # tape_start = return_0
     movq %rax, %r12
     # tape_len += TAPE_CHUNK_SIZE
@@ -25,7 +25,7 @@
     # return_0 ?= return_0
     testw %ax, %ax
     # return_0 < 0
-    js .leave
+    js .failure
     # bswap return_0
     ror $8, %ax
     # *(tape_start + tape_pos) = return_0

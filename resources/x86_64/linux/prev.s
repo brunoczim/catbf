@@ -12,7 +12,7 @@
     # result_0 ?= null
     test %rax, %rax
     # result == null
-    jz .leave
+    jz .failure
     # tape_pos += TAPE_CHUNK_SIZE
     addq $TAPE_CHUNK_SIZE, %r14
     # tape_start = return_0

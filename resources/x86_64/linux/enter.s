@@ -19,7 +19,7 @@
     # result_0 ?= null
     test %rax, %rax
     # result == null
-    jz .leave
+    jz .failure
     # tape_start = result_0
     movq %rax, %r12
     ### enter end
