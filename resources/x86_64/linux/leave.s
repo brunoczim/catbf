@@ -8,10 +8,10 @@
     # catbf_detroy_tape(tape_start)
     call catbf_destroy_tape
     # restore registers
+    popq %rbx
     popq %r12
     popq %r13
     popq %r14
-    popq %rbx
     # return to caller
     ret
     ### leave end

@@ -72,6 +72,13 @@ pub fn compile(program: &Program) -> Result<Executable, Error> {
     compiler.first_pass(program);
     compiler.second_pass()?;
 
+    for chunk in compiler.buf.chunks(4) {
+        for byte in chunk.iter().copied() {
+            print!("{:02x} ", byte);
+        }
+        println!();
+    }
+
     unsafe { Executable::new(&compiler.buf[..]) }
 }
 
